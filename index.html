@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flashcards</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+  <style>
+    :root {
+      --bg:         #f7f5f0;
+      --surface:    #ffffff;
+      --surface-2:  #f0ede6;
+      --border:     rgba(0,0,0,0.10);
+      --border-md:  rgba(0,0,0,0.20);
+      --text:       #1a1a18;
+      --text-muted: #7a7870;
+      --radius-md:  8px;
+      --radius-lg:  14px;
+      --correct-bg: #eaf3de; --correct-bd: #97c459; --correct-tx: #3b6d11;
+      --wrong-bg:   #fcebeb; --wrong-bd:   #f09595; --wrong-tx:   #a32d2d;
+      --info-bd:    #378add; --info-bg:    #e6f1fb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:         #1a1916; --surface:   #242320; --surface-2: #2e2c29;
+        --border:     rgba(255,255,255,0.10); --border-md: rgba(255,255,255,0.20);
+        --text:       #f0ede6; --text-muted: #8a8880;
+        --correct-bg: #1a2e0d; --correct-bd: #3b6d11; --correct-tx: #c0dd97;
+        --wrong-bg:   #2e0d0d; --wrong-bd:   #a32d2d; --wrong-tx:   #f7c1c1;
+        --info-bg:    #0c2540;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Fraunces', serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    .app { max-width: 640px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; gap: 12px; }
+    .logo { font-size: 24px; font-weight: 500; letter-spacing: -0.5px; }
+    .logo em { font-style: italic; color: var(--text-muted); }
+    .hdr-right { display: flex; align-items: center; gap: 10px; }
+    .hdr-stats { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-muted); }
+
+    .sync-indicator {
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      display: flex; align-items: center; gap: 5px;
+      color: var(--text-muted);
+    }
+    .sync-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #97c459; flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .sync-dot.syncing { background: #ef9f27; animation: pulse 1s infinite; }
+    .sync-dot.error   { background: #e24b4a; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: var(--radius-lg); padding: 4px; margin-bottom: 2rem; }
+    .tab { flex: 1; padding: 9px 12px; font-size: 14px; font-family: 'Fraunces', serif; border: none; background: transparent; cursor: pointer; border-radius: var(--radius-md); color: var(--text-muted); transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .tab i { font-size: 16px; }
+    .tab.active { background: var(--surface); border: 0.5px solid var(--border); color: var(--text); font-weight: 500; }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+    .deck-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem; cursor: pointer; transition: border-color 0.2s, transform 0.15s; position: relative; user-select: none; }
+    .deck-card:hover { border-color: var(--border-md); transform: translateY(-1px); }
+    .deck-card.selected { border: 2px solid var(--info-bd); background: var(--info-bg); }
+    .deck-emoji { font-size: 28px; margin-bottom: 10px; display: block; }
+    .deck-name  { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+    .deck-count { font-size: 12px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+    .deck-del { position: absolute; top: 8px; right: 8px; background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 16px; opacity: 0; transition: opacity 0.2s; padding: 2px; border-radius: 4px; }
+    .deck-card:hover .deck-del { opacity: 1; }
+    .deck-del:hover { color: var(--wrong-tx); }
+
+    .add-deck-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 14px 16px; background: transparent; border: 0.5px dashed var(--border-md); border-radius: var(--radius-lg); cursor: pointer; font-size: 14px; color: var(--text-muted); font-family: 'Fraunces', serif; transition: all 0.2s; }
+    .add-deck-btn:hover { background: var(--surface); color: var(--text); }
+
+    .section-deck-header { display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 0.5px solid var(--border); }
+    .dh-emoji { font-size: 22px; }
+    .dh-name  { font-size: 16px; font-weight: 500; }
+    .dh-count { margin-left: auto; font-size: 12px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-bottom: 1.5rem; }
+    @media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } }
+
+    input[type="text"] { height: 38px; padding: 0 12px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); background: var(--surface); color: var(--text); font-family: 'Fraunces', serif; font-size: 14px; outline: none; transition: border-color 0.2s; width: 100%; }
+    input[type="text"]:focus { border-color: var(--info-bd); }
+    input[type="text"]::placeholder { color: var(--text-muted); }
+    input[type="text"]:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary { height: 38px; padding: 0 18px; background: var(--text); color: var(--bg); border: none; border-radius: var(--radius-md); cursor: pointer; font-family: 'Fraunces', serif; font-size: 14px; white-space: nowrap; transition: opacity 0.2s; }
+    .btn-primary:hover { opacity: 0.8; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-secondary { height: 38px; padding: 0 18px; background: transparent; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); cursor: pointer; font-family: 'Fraunces', serif; font-size: 14px; color: var(--text); transition: background 0.2s; }
+    .btn-secondary:hover { background: var(--surface-2); }
+
+    .card-list { display: flex; flex-direction: column; gap: 8px; }
+    .card-item { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; align-items: center; font-size: 13px; }
+    .ci-back { color: var(--text-muted); }
+    .card-del { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 16px; display: flex; align-items: center; transition: color 0.2s; }
+    .card-del:hover { color: var(--wrong-tx); }
+
+    .study-wrap { max-width: 480px; margin: 0 auto; }
+    .progress-bar { height: 3px; background: var(--surface-2); border-radius: 2px; margin-bottom: 2rem; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--text); border-radius: 2px; transition: width 0.4s ease; }
+
+    .flashcard-wrap { perspective: 1200px; height: 260px; margin-bottom: 1.5rem; cursor: pointer; }
+    .flashcard { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.4,0,0.2,1); }
+    .flashcard.flipped { transform: rotateY(180deg); }
+    .card-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center; }
+    .card-face.back { transform: rotateY(180deg); }
+    .card-label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); font-family: 'DM Mono', monospace; margin-bottom: 1rem; }
+    .card-text  { font-size: 22px; font-weight: 300; line-height: 1.5; }
+    .card-hint  { margin-top: 1rem; font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+    .study-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.5rem; }
+    .btn-wrong    { padding: 12px; background: var(--wrong-bg);   border: 0.5px solid var(--wrong-bd);   color: var(--wrong-tx);   border-radius: var(--radius-md); cursor: pointer; font-family: 'Fraunces', serif; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; transition: opacity 0.2s; }
+    .btn-correct  { padding: 12px; background: var(--correct-bg); border: 0.5px solid var(--correct-bd); color: var(--correct-tx); border-radius: var(--radius-md); cursor: pointer; font-family: 'Fraunces', serif; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; transition: opacity 0.2s; }
+    .btn-wrong:hover, .btn-correct:hover { opacity: 0.8; }
+
+    .study-nav { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+    .results-box { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 2.5rem 2rem; text-align: center; }
+    .results-big { font-size: 56px; font-weight: 300; margin: 0.75rem 0 0.5rem; }
+    .results-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 2rem; }
+    .stat-row { display: flex; justify-content: center; gap: 2.5rem; margin-bottom: 2rem; }
+    .stat-n { font-size: 24px; font-weight: 500; }
+    .stat-l { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 14px; line-height: 1.7; }
+    .empty-state i { font-size: 32px; display: block; margin-bottom: 1rem; }
+
+    /* skeleton loader */
+    .skeleton { background: var(--surface-2); border-radius: var(--radius-md); animation: shimmer 1.4s infinite; }
+    @keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+    .modal { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.75rem; width: 100%; max-width: 340px; }
+    .modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 1.25rem; }
+    .modal input { margin-bottom: 0; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
+
+    .emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 1.25rem; }
+    .emoji-btn { aspect-ratio: 1; background: var(--surface-2); border: 0.5px solid transparent; border-radius: var(--radius-md); cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .emoji-btn:hover { background: var(--bg); }
+    .emoji-btn.sel { border-color: var(--info-bd); background: var(--info-bg); }
+
+    .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 20px; border-radius: var(--radius-md); font-size: 13px; font-family: 'DM Mono', monospace; z-index: 300; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <header class="header">
+    <div class="logo">flash<em>cards</em></div>
+    <div class="hdr-right">
+      <div class="sync-indicator">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-label">cargando…</span>
+      </div>
+      <div class="hdr-stats" id="hdr-stats"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" role="tab" onclick="switchTab('decks')">  <i class="ti ti-stack-2" aria-hidden="true"></i> Mazos</button>
+    <button class="tab"        role="tab" onclick="switchTab('create')"> <i class="ti ti-plus"    aria-hidden="true"></i> Crear</button>
+    <button class="tab"        role="tab" onclick="switchTab('study')">  <i class="ti ti-school"  aria-hidden="true"></i> Estudiar</button>
+  </nav>
+
+  <section id="sec-decks"  class="section active" role="tabpanel">
+    <div class="deck-grid" id="deck-grid">
+      <!-- skeleton -->
+      <div class="skeleton" style="height:110px"></div>
+      <div class="skeleton" style="height:110px"></div>
+      <div class="skeleton" style="height:110px"></div>
+    </div>
+    <button class="add-deck-btn" id="add-deck-btn" onclick="openNewDeck()" disabled>
+      <i class="ti ti-plus" aria-hidden="true"></i> Nuevo mazo
+    </button>
+  </section>
+
+  <section id="sec-create" class="section" role="tabpanel">
+    <div id="create-prompt" class="empty-state">
+      <i class="ti ti-stack-2" aria-hidden="true"></i>
+      Selecciona un mazo desde la pestaña <strong>Mazos</strong><br>para añadir tarjetas
+    </div>
+    <div id="create-body" style="display:none">
+      <div class="section-deck-header">
+        <span class="dh-emoji" id="cre-emoji"></span>
+        <span class="dh-name"  id="cre-name"></span>
+        <span class="dh-count" id="cre-count"></span>
+      </div>
+      <div class="form-row">
+        <input type="text" id="inp-front" placeholder="Frente (pregunta)" />
+        <input type="text" id="inp-back"  placeholder="Reverso (respuesta)" />
+        <button class="btn-primary" id="btn-add-card" onclick="addCard()">Añadir</button>
+      </div>
+      <div class="card-list" id="card-list"></div>
+    </div>
+  </section>
+
+  <section id="sec-study" class="section" role="tabpanel">
+    <div id="study-prompt" class="empty-state">
+      <i class="ti ti-school" aria-hidden="true"></i>
+      Selecciona un mazo desde la pestaña <strong>Mazos</strong><br>para comenzar a estudiar
+    </div>
+    <div id="study-body" style="display:none" class="study-wrap"></div>
+  </section>
+</div>
+
+<!-- Modal nuevo mazo -->
+<div id="modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h3>Nuevo mazo</h3>
+    <div class="emoji-grid" id="emoji-grid"></div>
+    <input type="text" id="deck-name-inp" placeholder="Nombre del mazo" maxlength="30" />
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" id="btn-create-deck" onclick="createDeck()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  /* ═══════════════════════════════════════════
+     SUPABASE CONFIG
+  ═══════════════════════════════════════════ */
+  const SUPA_URL = 'https://fkzracujkaewqzswykxf.supabase.co';
+  const SUPA_KEY = 'sb_publishable_Et51ZoU3xWudXgZolFx06A_m2MCJf9a';
+
+  const HEADERS = {
+    'Content-Type':  'application/json',
+    'apikey':        SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Prefer':        'return=representation',
+  };
+
+  async function sbGet(path) {
+    const r = await fetch(SUPA_URL + '/rest/v1/' + path, { headers: HEADERS });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+
+  async function sbPost(table, body) {
+    const r = await fetch(SUPA_URL + '/rest/v1/' + table, {
+      method: 'POST', headers: HEADERS, body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+
+  async function sbDelete(table, filter) {
+    const r = await fetch(SUPA_URL + '/rest/v1/' + table + '?' + filter, {
+      method: 'DELETE', headers: HEADERS
+    });
+    if (!r.ok) throw new Error(await r.text());
+  }
+
+  /* ═══════════════════════════════════════════
+     STATE
+  ═══════════════════════════════════════════ */
+  let state = { decks: [], selectedDeck: null };
+  let studyState = null;
+  let _selEmoji  = '📚';
+  const EMOJIS   = ['📚','🧠','🔬','🌍','✏️','🎨','💻','🔢','🎵','🏛️','⚗️','🌱','💡','🗺️','🏋️','🎯'];
+
+  /* ═══════════════════════════════════════════
+     SYNC UI
+  ═══════════════════════════════════════════ */
+  function setSyncState(s) {
+    const dot   = document.getElementById('sync-dot');
+    const label = document.getElementById('sync-label');
+    dot.className = 'sync-dot' + (s === 'syncing' ? ' syncing' : s === 'error' ? ' error' : '');
+    label.textContent = s === 'syncing' ? 'guardando…' : s === 'error' ? 'sin conexión' : 'sincronizado';
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  /* ═══════════════════════════════════════════
+     LOAD DATA
+  ═══════════════════════════════════════════ */
+  async function loadAll() {
+    setSyncState('syncing');
+    try {
+      const [decks, cards] = await Promise.all([
+        sbGet('decks?select=*&order=created_at.asc'),
+        sbGet('cards?select=*&order=created_at.asc'),
+      ]);
+      state.decks = decks.map(d => ({
+        ...d,
+        cards: cards.filter(c => c.deck_id === d.id)
+      }));
+      setSyncState('ok');
+    } catch(e) {
+      setSyncState('error');
+      showToast('Error al cargar datos');
+      console.error(e);
+    }
+    document.getElementById('add-deck-btn').disabled = false;
+    renderDecks();
+    renderCreate();
+    renderStudy();
+  }
+
+  /* ═══════════════════════════════════════════
+     TABS
+  ═══════════════════════════════════════════ */
+  function switchTab(tab) {
+    const names = ['decks','create','study'];
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i] === tab));
+    document.querySelectorAll('.section').forEach((s,i) => s.classList.toggle('active', names[i] === tab));
+  }
+
+  /* ═══════════════════════════════════════════
+     DECKS
+  ═══════════════════════════════════════════ */
+  function renderDecks() {
+    const grid = document.getElementById('deck-grid');
+    grid.innerHTML = '';
+    if (!state.decks.length) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:2rem 0"><i class="ti ti-stack-2" aria-hidden="true"></i>Aún no tienes mazos.<br>Crea el primero abajo.</div>';
+    }
+    state.decks.forEach(d => {
+      const el = document.createElement('div');
+      el.className = 'deck-card' + (state.selectedDeck === d.id ? ' selected' : '');
+      el.setAttribute('role','button'); el.setAttribute('tabindex','0');
+      el.innerHTML = `
+        <span class="deck-emoji" aria-hidden="true">${d.emoji}</span>
+        <div class="deck-name">${escHtml(d.name)}</div>
+        <div class="deck-count">${d.cards.length} tarjeta${d.cards.length!==1?'s':''}</div>
+        <button class="deck-del" onclick="event.stopPropagation();deleteDeck('${d.id}')" aria-label="Eliminar ${escHtml(d.name)}">
+          <i class="ti ti-x" aria-hidden="true"></i>
+        </button>`;
+      el.addEventListener('click', () => selectDeck(d.id));
+      el.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' ') selectDeck(d.id); });
+      grid.appendChild(el);
+    });
+    const total = state.decks.reduce((a,d) => a + d.cards.length, 0);
+    document.getElementById('hdr-stats').textContent =
+      state.decks.length + ' mazo' + (state.decks.length!==1?'s':'') +
+      ' · ' + total + ' tarjeta' + (total!==1?'s':'');
+  }
+
+  function selectDeck(id) {
+    state.selectedDeck = id;
+    renderDecks(); renderCreate(); renderStudy();
+  }
+
+  async function deleteDeck(id) {
+    if (!confirm('¿Eliminar este mazo y todas sus tarjetas?')) return;
+    setSyncState('syncing');
+    try {
+      await sbDelete('decks', 'id=eq.' + id);
+      state.decks = state.decks.filter(d => d.id !== id);
+      if (state.selectedDeck === id) state.selectedDeck = null;
+      setSyncState('ok');
+      showToast('Mazo eliminado');
+    } catch(e) {
+      setSyncState('error'); showToast('Error al eliminar'); console.error(e);
+    }
+    renderDecks(); renderCreate(); renderStudy();
+  }
+
+  /* ═══════════════════════════════════════════
+     CREATE / CARDS
+  ═══════════════════════════════════════════ */
+  function renderCreate() {
+    const deck = state.decks.find(d => d.id === state.selectedDeck);
+    document.getElementById('create-prompt').style.display = deck ? 'none' : '';
+    const body = document.getElementById('create-body');
+    body.style.display = deck ? 'block' : 'none';
+    if (!deck) return;
+
+    document.getElementById('cre-emoji').textContent = deck.emoji;
+    document.getElementById('cre-name').textContent  = deck.name;
+    document.getElementById('cre-count').textContent = deck.cards.length + ' tarjeta' + (deck.cards.length!==1?'s':'');
+
+    const list = document.getElementById('card-list');
+    list.innerHTML = '';
+    if (!deck.cards.length) {
+      list.innerHTML = '<div class="empty-state" style="padding:1.5rem 0"><i class="ti ti-cards" aria-hidden="true"></i>Añade tu primera tarjeta arriba</div>';
+      return;
+    }
+    deck.cards.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'card-item';
+      row.innerHTML = `
+        <span>${escHtml(c.front)}</span>
+        <span class="ci-back">${escHtml(c.back)}</span>
+        <button class="card-del" onclick="deleteCard('${c.id}')" aria-label="Eliminar tarjeta">
+          <i class="ti ti-trash" style="font-size:16px" aria-hidden="true"></i>
+        </button>`;
+      list.appendChild(row);
+    });
+  }
+
+  async function addCard() {
+    const f = document.getElementById('inp-front').value.trim();
+    const b = document.getElementById('inp-back').value.trim();
+    if (!f || !b) return;
+    const deck = state.decks.find(d => d.id === state.selectedDeck);
+    if (!deck) return;
+
+    const btn = document.getElementById('btn-add-card');
+    btn.disabled = true;
+    setSyncState('syncing');
+    try {
+      const [created] = await sbPost('cards', { deck_id: deck.id, front: f, back: b });
+      deck.cards.push(created);
+      document.getElementById('inp-front').value = '';
+      document.getElementById('inp-back').value  = '';
+      document.getElementById('inp-front').focus();
+      setSyncState('ok');
+    } catch(e) {
+      setSyncState('error'); showToast('Error al guardar tarjeta'); console.error(e);
+    }
+    btn.disabled = false;
+    renderCreate(); renderDecks();
+  }
+
+  async function deleteCard(cid) {
+    const deck = state.decks.find(d => d.id === state.selectedDeck);
+    if (!deck) return;
+    setSyncState('syncing');
+    try {
+      await sbDelete('cards', 'id=eq.' + cid);
+      deck.cards = deck.cards.filter(c => c.id !== cid);
+      setSyncState('ok');
+    } catch(e) {
+      setSyncState('error'); showToast('Error al eliminar tarjeta'); console.error(e);
+    }
+    renderCreate(); renderDecks();
+  }
+
+  /* ═══════════════════════════════════════════
+     STUDY
+  ═══════════════════════════════════════════ */
+  function renderStudy() {
+    const deck = state.decks.find(d => d.id === state.selectedDeck);
+    document.getElementById('study-prompt').style.display = deck ? 'none' : '';
+    const body = document.getElementById('study-body');
+    body.style.display = deck ? 'block' : 'none';
+    if (!deck) return;
+    if (!deck.cards.length) {
+      body.innerHTML = '<div class="empty-state"><i class="ti ti-cards" aria-hidden="true"></i>Este mazo no tiene tarjetas.<br>Ve a <strong>Crear</strong> para añadir.</div>';
+      return;
+    }
+    startStudy(deck);
+  }
+
+  function startStudy(deck) {
+    const shuffled = [...deck.cards].sort(() => Math.random() - 0.5);
+    studyState = { deck, cards: shuffled, idx: 0, correct: 0, wrong: 0 };
+    renderCard();
+  }
+
+  function renderCard() {
+    const ss   = studyState;
+    const body = document.getElementById('study-body');
+    if (ss.idx >= ss.cards.length) { renderResults(); return; }
+    const c   = ss.cards[ss.idx];
+    const pct = Math.round((ss.idx / ss.cards.length) * 100);
+    body.innerHTML = `
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="flashcard-wrap" onclick="flipCard()" role="button" tabindex="0" aria-label="Voltear tarjeta">
+        <div class="flashcard" id="fc">
+          <div class="card-face front">
+            <div class="card-label">Pregunta</div>
+            <div class="card-text">${escHtml(c.front)}</div>
+            <div class="card-hint">toca para voltear</div>
+          </div>
+          <div class="card-face back">
+            <div class="card-label">Respuesta</div>
+            <div class="card-text">${escHtml(c.back)}</div>
+          </div>
+        </div>
+      </div>
+      <div class="study-actions" id="study-actions" style="display:none">
+        <button class="btn-wrong"   onclick="markCard(false)"><i class="ti ti-x"     aria-hidden="true"></i> No lo sabía</button>
+        <button class="btn-correct" onclick="markCard(true)"> <i class="ti ti-check" aria-hidden="true"></i> Lo sabía</button>
+      </div>
+      <div class="study-nav">
+        <span>${ss.deck.emoji} ${escHtml(ss.deck.name)}</span>
+        <span>${ss.idx + 1} / ${ss.cards.length}</span>
+      </div>`;
+    document.querySelector('.flashcard-wrap').addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') flipCard();
+    });
+  }
+
+  function flipCard() {
+    const fc = document.getElementById('fc');
+    if (fc) { fc.classList.add('flipped'); document.getElementById('study-actions').style.display = 'grid'; }
+  }
+
+  function markCard(ok) {
+    if (ok) studyState.correct++; else studyState.wrong++;
+    studyState.idx++;
+    renderCard();
+  }
+
+  function renderResults() {
+    const ss  = studyState;
+    const pct = Math.round((ss.correct / ss.cards.length) * 100);
+    document.getElementById('study-body').innerHTML = `
+      <div class="results-box">
+        <div class="card-label">Sesión completada</div>
+        <div class="results-big">${pct}%</div>
+        <div class="results-sub">de respuestas correctas</div>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-n" style="color:var(--correct-tx)">${ss.correct}</div><div class="stat-l">correctas</div></div>
+          <div class="stat"><div class="stat-n" style="color:var(--wrong-tx)">${ss.wrong}</div><div class="stat-l">incorrectas</div></div>
+          <div class="stat"><div class="stat-n">${ss.cards.length}</div><div class="stat-l">total</div></div>
+        </div>
+        <button class="btn-primary" onclick="startStudy(studyState.deck)">Repetir sesión</button>
+      </div>`;
+  }
+
+  /* ═══════════════════════════════════════════
+     MODAL
+  ═══════════════════════════════════════════ */
+  function openNewDeck() {
+    _selEmoji = EMOJIS[0];
+    const grid = document.getElementById('emoji-grid');
+    grid.innerHTML = '';
+    EMOJIS.forEach(e => {
+      const btn = document.createElement('button');
+      btn.className = 'emoji-btn' + (e === _selEmoji ? ' sel' : '');
+      btn.textContent = e; btn.type = 'button';
+      btn.onclick = () => {
+        _selEmoji = e;
+        document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+      };
+      grid.appendChild(btn);
+    });
+    document.getElementById('deck-name-inp').value = '';
+    document.getElementById('modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('deck-name-inp').focus(), 50);
+  }
+
+  async function createDeck() {
+    const name = document.getElementById('deck-name-inp').value.trim();
+    if (!name) { document.getElementById('deck-name-inp').focus(); return; }
+    const btn = document.getElementById('btn-create-deck');
+    btn.disabled = true;
+    setSyncState('syncing');
+    try {
+      const [created] = await sbPost('decks', { name, emoji: _selEmoji });
+      state.decks.push({ ...created, cards: [] });
+      setSyncState('ok');
+      showToast('Mazo creado');
+      closeModal();
+      renderDecks();
+    } catch(e) {
+      setSyncState('error'); showToast('Error al crear mazo'); console.error(e);
+    }
+    btn.disabled = false;
+  }
+
+  function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+  /* ═══════════════════════════════════════════
+     UTILS
+  ═══════════════════════════════════════════ */
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ─ keyboard shortcuts ─ */
+  document.addEventListener('keydown', e => {
+    if (document.getElementById('modal').style.display !== 'none') {
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Enter' && document.activeElement.id === 'deck-name-inp') createDeck();
+      return;
+    }
+    if (document.activeElement.tagName === 'INPUT') {
+      if (e.key === 'Enter') addCard();
+      return;
+    }
+    if (studyState && studyState.idx < studyState.cards.length) {
+      if (e.key === ' ')           { e.preventDefault(); flipCard(); }
+      if (e.key === 'ArrowRight')  markCard(true);
+      if (e.key === 'ArrowLeft')   markCard(false);
+    }
+  });
+
+  /* ─ init ─ */
+  loadAll();
+</script>
+</body>
+</html>
